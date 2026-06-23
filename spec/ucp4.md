@@ -81,20 +81,20 @@ establishment:
 
 | Time    | Direction | Action                          | Description                                                 |
 |---------|-----------|---------------------------------|-------------------------------------------------------------|
-| +0ms    | C -> D     | `getInfo`                       | Controller requests device info                             |
-| +0ms    | D -> C     | `getConsoleInfo`                | Device requests console info (sent nearly simultaneously)   |
-| +207ms  | D -> C     | `getInfo` response              | Device sends its capabilities                               |
-| +312ms  | C -> D     | `getConsoleInfo` response       | Controller sends console ID + name                          |
-| +619ms  | C -> D     | `networkStatus`                 | Controller requests network status                          |
-| +628ms  | D -> C     | `networkStatus` response        | Device sends link speed                                     |
-| +628ms  | C -> D     | `changeUserPassword`            | Controller pushes password change                           |
-| +636ms  | D -> C     | `changeUserPassword` response   | Device acknowledges                                         |
-| +684ms  | C -> D     | `configure`                     | Controller pushes liveview + camera list                    |
-| +684ms  | C -> D     | `enableUpdatesChannel`          | Controller tells device to open updates channel             |
-| +884ms  | D -> C     | `enableUpdatesChannel` response | Device acknowledges                                         |
-| +886ms  | D -> C     | log                             | Device logs `onConfigure: count=16`                         |
-| +858ms  | D -> C     | `getStreamAlias` ×N             | Device requests stream aliases (one per camera in liveview) |
-| +858ms+ | C -> D     | `getStreamAlias` responses      | Controller returns `{alias, url, rtspUrl}` per camera       |
+| +0ms    | C -> D    | `getInfo`                       | Controller requests device info                             |
+| +0ms    | D -> C    | `getConsoleInfo`                | Device requests console info (sent nearly simultaneously)   |
+| +207ms  | D -> C    | `getInfo` response              | Device sends its capabilities                               |
+| +312ms  | C -> D    | `getConsoleInfo` response       | Controller sends console ID + name                          |
+| +619ms  | C -> D    | `networkStatus`                 | Controller requests network status                          |
+| +628ms  | D -> C    | `networkStatus` response        | Device sends link speed                                     |
+| +628ms  | C -> D    | `changeUserPassword`            | Controller pushes password change                           |
+| +636ms  | D -> C    | `changeUserPassword` response   | Device acknowledges                                         |
+| +684ms  | C -> D    | `configure`                     | Controller pushes liveview + camera list                    |
+| +684ms  | C -> D    | `enableUpdatesChannel`          | Controller tells device to open updates channel             |
+| +884ms  | D -> C    | `enableUpdatesChannel` response | Device acknowledges                                         |
+| +886ms  | D -> C    | log                             | Device logs `onConfigure: count=16`                         |
+| +858ms  | D -> C    | `getStreamAlias` ×N             | Device requests stream aliases (one per camera in liveview) |
+| +858ms+ | C -> D    | `getStreamAlias` responses      | Controller returns `{alias, url, rtspUrl}` per camera       |
 
 After this sequence, the device opens a second WebSocket with `sec-websocket-protocol: updates` using the `uri` from
 `enableUpdatesChannel`.
