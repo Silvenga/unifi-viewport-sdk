@@ -1,5 +1,13 @@
 # Global Coding Conventions
 
+### SDK Conventions
+
+- Treat network data as untrusted. Validate data to the best of our knowledge. Don't silently hide issues, emit `warn!`
+  for unexpected data to allow us to continuously learn about the protocols.
+- As a reverse engineering project, we cannot guarantee our understanding of the protocol is correct. The SDK should
+  give consuming code the flexibility to handle data we do not understand or that we have an incorrect interpretation
+  of.
+
 ## General
 
 - Do not write a comment without justification. If code is self-explanatory, leave it uncommented.
@@ -12,10 +20,6 @@
 
 ## Rust
 
-### Linting
-
-- Use `cargo clippy` to check files.
-
 ### Module Organization
 
 - Prefer private modules (`mod foo;`) with explicitly re-exported public API via `pub use` in `mod.rs`.
@@ -25,9 +29,30 @@
 ### Module Size
 
 - Target modules under 500 LoC (excluding tests).
-- If a file exceeds roughly 800 LoC, add new functionality in a new module instead of extending the existing file unless there is a strong documented reason not to.
-- When extracting code from a large module, move the related tests and module/type docs toward the new implementation so the invariants stay close to the code that owns them.
+- If a file exceeds roughly 800 LoC, add new functionality in a new module instead of extending the existing file unless
+  there is a strong, documented reason not to.
+- When extracting code from a large module, move the related tests and module/type docs toward the new implementation so
+  the invariants stay close to the code that owns them.
 - Avoid logic in `mod.rs` files, favor creating a new file for logic to keep `mod.rs` clean.
+
+### Logging
+
+Use `tracing` for logging. Import the logging modules, e.g., `use tracing::info;` instead of using the absolute path,
+e.g., `tracing::info!("Logging...");`.
+
+Logging should always be in Sentence case (the first letter capitalized, proper names capitalized, using proper grammar,
+etc.).
+
+Logging Levels:
+
+- `error`: For reporting errors that are not expected to occur during normal operation and typically require human
+  intervention.
+- `warn`: For reporting non-critical (recoverable) issues that may indicate a problem, but do not typically require
+  human intervention.
+- `info`: For reporting general information about the application's state or progress. Should be useful for an end-user
+  to understand the application's behavior.
+- `debug`: For detailed information that is primarily useful to developers.
+- `trace`: For extremely detailed information required for low-level debugging.
 
 ### Error Handling
 
@@ -47,7 +72,8 @@
 ### Visibility
 
 - Default to private. Use `pub` only for the crate's public API surface.
-- Use `#[cfg(test)]` visibility (e.g. `pub` on test-only constructors like `open_in_memory`) rather than making internals permanently public.
+- Use `#[cfg(test)]` visibility (e.g. `pub` on test-only constructors like `open_in_memory`) rather than making
+  internals permanently public.
 
 ### Types & Derives
 
@@ -57,7 +83,20 @@
 
 ### Imports
 
-- Do not separate `use` groups with a blank line. All `use` statments should be in a single block. Let the formatter sort the groups automatically.
+- Do not separate `use` groups with a blank line. All `use` statments should be in a single block. Let the formatter
+  sort the groups automatically.
+
+```rust
+// DO:
+use std::io;
+use thiserror::Error;
+use crate::foo;
+
+// NOT:
+use std::io;
+
+use thiserror::Error;
+```
 
 ### Tests
 
@@ -66,7 +105,13 @@
 - Use `assert_matches!` (from `assert_matches` crate) for enum variant matching.
 - Use `assert_fs` and `assert_cmd` for filesystem and CLI integration tests.
 - Name tests using `when_<condition>_then_<action>_should_<expected>` convention.
-- Structure tests in Arrange-Act-Assert (AAA) form. Do not add `// Arrange`, `// Act`, `// Assert` comments - use blank lines to separate the sections.
+- Structure tests in Arrange-Act-Assert (AAA) form. Do not add `// Arrange`, `// Act`, `// Assert` comments - use blank
+  lines to separate the sections.
+
+### Verification
+
+- Use `cargo fmt`, `cargo clippy`, and `cargo test` to verify correctness.
+- Use `scripts/check_use_groups.sh` to validate `use` groups formatting.
 
 ## Constraints
 

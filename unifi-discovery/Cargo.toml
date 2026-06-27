@@ -1,0 +1,31 @@
+[package]
+name = "unifi-discovery"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "UniFi Protect device discovery protocol (UDP 10001) client and responder"
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme = "../README.md"
+keywords = ["unifi", "ubiquiti", "discovery", "udp", "tlv"]
+categories = ["api-bindings", "network-programming"]
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "unifi_discovery"
+path = "src/lib.rs"
+
+[dependencies]
+bytes = { workspace = true }
+indexmap = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+assert_matches = "1.5.0"

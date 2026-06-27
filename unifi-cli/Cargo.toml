@@ -1,0 +1,31 @@
+[package]
+name = "unifi-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "CLI tool for UniFi Protect protocol testing and debugging"
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme = "../README.md"
+keywords = ["unifi", "ubiquiti", "cli", "protect"]
+categories = ["command-line-utilities", "network-programming"]
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "unifi-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+local-ip-address = { workspace = true }
+sysinfo = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+unifi-discovery = { path = "../unifi-discovery" }
