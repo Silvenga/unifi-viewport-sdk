@@ -1,5 +1,8 @@
 # unifi-discovery
 
+This crate is a protocol primitive for both discovery of devices (as a controller) and responding to a controller (as a
+device).
+
 - Parse leniently, never panic on malformed input. Emit `warn!` for unexpected data (non-zero reserved bytes, trailing
   bytes, oversized fields) and continue processing.
 - Preserve all parsed data including unknown fields. No silent data loss - unknown TLV types stay in the bag and

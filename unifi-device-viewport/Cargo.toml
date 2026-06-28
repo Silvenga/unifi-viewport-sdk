@@ -1,0 +1,47 @@
+[package]
+name = "unifi-device-viewport"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Device-side implementation of the Ubiquiti Protect Viewport adoption server"
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme = "../README.md"
+keywords = ["unifi", "ubiquiti", "viewport", "adoption", "tls"]
+categories = ["api-bindings", "network-programming"]
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "unifi_device_viewport"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+bytes = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+rcgen = { workspace = true }
+rustls = { workspace = true }
+rustls-pki-types = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+time = { workspace = true }
+tokio = { workspace = true }
+tokio-rustls = { workspace = true }
+tracing = { workspace = true }
+unifi-discovery = { path = "../unifi-discovery" }
+
+[dev-dependencies]
+assert_matches = "1.5.0"
+reqwest = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }
+unifi-controller = { path = "../unifi-controller" }
+unifi-discovery = { path = "../unifi-discovery" }

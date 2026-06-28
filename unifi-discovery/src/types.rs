@@ -8,10 +8,13 @@ pub const TYPE_FIRMWARE: TypeCode = 0x03;
 pub const TYPE_UPTIME: TypeCode = 0x0A;
 pub const TYPE_HOSTNAME: TypeCode = 0x0B;
 pub const TYPE_PLATFORM: TypeCode = 0x0C;
+pub const TYPE_SIGNAL: TypeCode = 0x0F;
+pub const TYPE_SYSTEM_ID: TypeCode = 0x10;
 pub const TYPE_IS_DEFAULT: TypeCode = 0x17;
-pub const TYPE_GUID: TypeCode = 0x20;
-pub const TYPE_DEVICE_ID: TypeCode = 0x2B;
-pub const TYPE_NVR_HARDWARE_ID: TypeCode = 0x26;
+pub const TYPE_ANONYMOUS_ID: TypeCode = 0x20;
+pub const TYPE_CONTROLLER_ID: TypeCode = 0x26;
+pub const TYPE_GUID: TypeCode = 0x2B;
+pub const TYPE_DEFAULT_CREDENTIALS: TypeCode = 0x2C;
 
 /// A 6-byte MAC address.
 pub type MacAddress = [u8; 6];
@@ -133,16 +136,37 @@ impl DeviceInfo {
         self.tlvs.set(TYPE_HOSTNAME, hostname.as_bytes().to_vec());
     }
 
-    /// Returns the platform / short model (TLV type `0x0C`).
+    /// Returns the platform (TLV type `0x0C`).
     pub fn get_platform(&self) -> Option<String> {
         self.tlvs
             .get_first(TYPE_PLATFORM)
             .map(|v| String::from_utf8_lossy(v).into_owned())
     }
 
-    /// Sets the platform / short model (TLV type `0x0C`).
+    /// Sets the platform (TLV type `0x0C`).
     pub fn set_platform(&mut self, platform: &str) {
         self.tlvs.set(TYPE_PLATFORM, platform.as_bytes().to_vec());
+    }
+
+    /// Returns the signal value (TLV type `0x0F`, constant `0x00011F90`).
+    pub fn get_signal(&self) -> Option<u32> {
+        self.tlvs.get_first_u32_be(TYPE_SIGNAL)
+    }
+
+    /// Sets the signal value (TLV type `0x0F`).
+    pub fn set_signal(&mut self, signal: u32) {
+        self.tlvs.set(TYPE_SIGNAL, signal.to_be_bytes().to_vec());
+    }
+
+    /// Returns the system ID (TLV type `0x10`, e.g. `0x80E9` for UP Viewport).
+    pub fn get_system_id(&self) -> Option<u16> {
+        self.tlvs.get_first_u16_be(TYPE_SYSTEM_ID)
+    }
+
+    /// Sets the system ID (TLV type `0x10`).
+    pub fn set_system_id(&mut self, system_id: u16) {
+        self.tlvs
+            .set(TYPE_SYSTEM_ID, system_id.to_be_bytes().to_vec());
     }
 
     /// Returns whether the device is in factory-default state (TLV type `0x17`).
@@ -168,63 +192,74 @@ impl DeviceInfo {
         self.tlvs.set(TYPE_IS_DEFAULT, val.to_be_bytes().to_vec());
     }
 
-    /// Returns the device GUID as a UUID string (TLV type `0x20`).
-    pub fn get_guid(&self) -> Option<String> {
+    /// Returns the anonymous ID as a UUID string (TLV type `0x20`).
+    pub fn get_anonymous_id(&self) -> Option<String> {
         self.tlvs
-            .get_first(TYPE_GUID)
+            .get_first(TYPE_ANONYMOUS_ID)
             .map(|v| String::from_utf8_lossy(v).into_owned())
     }
 
-    /// Sets the device GUID as a UUID string (TLV type `0x20`).
-    pub fn set_guid(&mut self, guid: &str) {
-        self.tlvs.set(TYPE_GUID, guid.as_bytes().to_vec());
-    }
-
-    /// Returns the binary device ID (TLV type `0x2B`).
-    pub fn get_device_id(&self) -> Result<Option<[u8; 16]>, ParsingError> {
-        let value = match self.tlvs.get_first(TYPE_DEVICE_ID) {
-            Some(v) => v,
-            None => return Ok(None),
-        };
-        if value.len() == 16 {
-            let mut id = [0u8; 16];
-            id.copy_from_slice(value);
-            Ok(Some(id))
-        } else {
-            Err(ParsingError::BufferTooShort {
-                needed: 16,
-                available: value.len(),
-            })
-        }
-    }
-
-    /// Sets the binary device ID (TLV type `0x2B`).
-    pub fn set_device_id(&mut self, device_id: [u8; 16]) {
-        self.tlvs.set(TYPE_DEVICE_ID, device_id.to_vec());
-    }
-
-    /// Returns the NVR hardware ID, present only when adopted (TLV type `0x26`).
-    pub fn get_nvr_hardware_id(&self) -> Result<Option<[u8; 16]>, ParsingError> {
-        let value = match self.tlvs.get_first(TYPE_NVR_HARDWARE_ID) {
-            Some(v) => v,
-            None => return Ok(None),
-        };
-        if value.len() == 16 {
-            let mut id = [0u8; 16];
-            id.copy_from_slice(value);
-            Ok(Some(id))
-        } else {
-            Err(ParsingError::BufferTooShort {
-                needed: 16,
-                available: value.len(),
-            })
-        }
-    }
-
-    /// Sets the NVR hardware ID (TLV type `0x26`).
-    pub fn set_nvr_hardware_id(&mut self, nvr_hardware_id: [u8; 16]) {
+    /// Sets the anonymous ID as a UUID string (TLV type `0x20`).
+    pub fn set_anonymous_id(&mut self, anonymous_id: &str) {
         self.tlvs
-            .set(TYPE_NVR_HARDWARE_ID, nvr_hardware_id.to_vec());
+            .set(TYPE_ANONYMOUS_ID, anonymous_id.as_bytes().to_vec());
+    }
+
+    /// Returns the controller ID, present only when adopted (TLV type `0x26`).
+    pub fn get_controller_id(&self) -> Result<Option<[u8; 16]>, ParsingError> {
+        let value = match self.tlvs.get_first(TYPE_CONTROLLER_ID) {
+            Some(v) => v,
+            None => return Ok(None),
+        };
+        if value.len() == 16 {
+            let mut id = [0u8; 16];
+            id.copy_from_slice(value);
+            Ok(Some(id))
+        } else {
+            Err(ParsingError::BufferTooShort {
+                needed: 16,
+                available: value.len(),
+            })
+        }
+    }
+
+    /// Sets the controller ID (TLV type `0x26`).
+    pub fn set_controller_id(&mut self, controller_id: [u8; 16]) {
+        self.tlvs.set(TYPE_CONTROLLER_ID, controller_id.to_vec());
+    }
+
+    /// Returns the binary GUID (TLV type `0x2B`).
+    pub fn get_guid(&self) -> Result<Option<[u8; 16]>, ParsingError> {
+        let value = match self.tlvs.get_first(TYPE_GUID) {
+            Some(v) => v,
+            None => return Ok(None),
+        };
+        if value.len() == 16 {
+            let mut id = [0u8; 16];
+            id.copy_from_slice(value);
+            Ok(Some(id))
+        } else {
+            Err(ParsingError::BufferTooShort {
+                needed: 16,
+                available: value.len(),
+            })
+        }
+    }
+
+    /// Sets the binary GUID (TLV type `0x2B`).
+    pub fn set_guid(&mut self, guid: [u8; 16]) {
+        self.tlvs.set(TYPE_GUID, guid.to_vec());
+    }
+
+    /// Returns the default credentials bitfield (TLV type `0x2C`).
+    /// Bit 0 = `ubnt` supported, bit 1 = `ui` supported.
+    pub fn get_default_credentials(&self) -> Option<u8> {
+        self.tlvs.get_first_u8(TYPE_DEFAULT_CREDENTIALS)
+    }
+
+    /// Sets the default credentials bitfield (TLV type `0x2C`).
+    pub fn set_default_credentials(&mut self, credentials: u8) {
+        self.tlvs.set(TYPE_DEFAULT_CREDENTIALS, vec![credentials]);
     }
 }
 
@@ -293,27 +328,30 @@ mod tests {
         assert_eq!(info.get_platform().unwrap(), "UP Viewport");
         assert!(info.get_is_default().unwrap().unwrap());
         assert_eq!(
-            info.get_guid().unwrap(),
+            info.get_anonymous_id().unwrap(),
             "7f9c90a2-8152-5d63-214b-d96d6d894b1f"
         );
         assert_eq!(
-            info.get_device_id().unwrap().unwrap(),
+            info.get_guid().unwrap().unwrap(),
             [
                 0x13, 0x85, 0xfe, 0x74, 0x06, 0xad, 0x49, 0x6f, 0x93, 0x3e, 0xc1, 0x78, 0x5e, 0x3d,
                 0x79, 0x47
             ]
         );
-        assert!(info.get_nvr_hardware_id().unwrap().is_none());
+        assert_eq!(info.get_default_credentials().unwrap(), 0x03);
+        assert_eq!(info.get_system_id().unwrap(), 0x80E9);
+        assert_eq!(info.get_signal().unwrap(), 0x00011F90);
+        assert!(info.get_controller_id().unwrap().is_none());
     }
 
     #[test]
-    fn when_decode_post_adoption_then_nvr_hardware_id_present_and_is_default_false() {
+    fn when_decode_post_adoption_then_controller_id_present_and_is_default_false() {
         let info = frame_to_device_info(POST_ADOPTION_FRAME);
 
         assert!(!info.get_is_default().unwrap().unwrap());
         assert_eq!(info.get_uptime().unwrap().unwrap(), Duration::from_secs(89));
         assert_eq!(
-            info.get_nvr_hardware_id().unwrap().unwrap(),
+            info.get_controller_id().unwrap().unwrap(),
             [
                 0x53, 0x54, 0x0e, 0xa4, 0xb5, 0x20, 0x51, 0x2c, 0xaf, 0x90, 0xef, 0x08, 0xf1, 0x0e,
                 0xb2, 0xaa
@@ -352,7 +390,10 @@ mod tests {
         info.set_hostname("Test");
         info.set_platform("Test");
         info.set_is_default(true);
-        info.set_guid("550e8400-e29b-41d4-a716-446655440000");
+        info.set_anonymous_id("550e8400-e29b-41d4-a716-446655440000");
+        info.set_default_credentials(0x03);
+        info.set_system_id(0x80E9);
+        info.set_signal(0x00011F90);
 
         let frame = Frame::new(CMD_INFO, info.tlvs().clone());
         let encoded = frame.encode();
@@ -376,8 +417,11 @@ mod tests {
         assert_eq!(decoded.get_platform().unwrap(), "Test");
         assert!(decoded.get_is_default().unwrap().unwrap());
         assert_eq!(
-            decoded.get_guid().unwrap(),
+            decoded.get_anonymous_id().unwrap(),
             "550e8400-e29b-41d4-a716-446655440000"
         );
+        assert_eq!(decoded.get_default_credentials().unwrap(), 0x03);
+        assert_eq!(decoded.get_system_id().unwrap(), 0x80E9);
+        assert_eq!(decoded.get_signal().unwrap(), 0x00011F90);
     }
 }

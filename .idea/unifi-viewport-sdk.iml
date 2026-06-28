@@ -6,6 +6,10 @@
       <sourceFolder url="file://$MODULE_DIR$/unifi-cli/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/unifi-discovery/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/unifi-discovery/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/unifi-controller/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/unifi-controller/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/unifi-device-viewport/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/unifi-device-viewport/tests" isTestSource="true" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
     </content>
     <orderEntry type="inheritedJdk" />

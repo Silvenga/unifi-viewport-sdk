@@ -116,7 +116,7 @@ mod tests {
         info.set_hostname("Test");
         info.set_platform("Test");
         info.set_is_default(true);
-        info.set_guid("550e8400-e29b-41d4-a716-446655440000");
+        info.set_anonymous_id("550e8400-e29b-41d4-a716-446655440000");
 
         let responder =
             DiscoveryResponder::new(move || DiscoveryMessage::InfoResponse(info.clone()));
@@ -143,7 +143,7 @@ mod tests {
         assert_eq!(decoded.get_platform().unwrap(), "Test");
         assert!(decoded.get_is_default().unwrap().unwrap());
         assert_eq!(
-            decoded.get_guid().unwrap(),
+            decoded.get_anonymous_id().unwrap(),
             "550e8400-e29b-41d4-a716-446655440000"
         );
     }

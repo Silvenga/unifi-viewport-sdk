@@ -1,3 +1,4 @@
+use crate::device::DeviceCommand;
 use crate::discovery::{DiscoveryArgs, DiscoveryCommand};
 use clap::{Parser, Subcommand};
 
@@ -24,6 +25,11 @@ pub enum Command {
 
         #[command(flatten)]
         args: DiscoveryArgs,
+    },
+    /// Simulate a UniFi Protect device
+    Device {
+        #[command(subcommand)]
+        command: DeviceCommand,
     },
 }
 

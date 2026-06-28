@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["unifi-cli", "unifi-discovery"]
+members = ["unifi-cli", "unifi-discovery", "unifi-device-viewport", "unifi-controller"]
 
 [workspace.package]
 version = "0.1.0"
@@ -52,7 +52,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 thiserror = "2.0.18"
 anyhow = "1.0.103"
-tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "net", "time", "sync"] }
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "net", "time", "sync", "io-util"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt"] }
 clap = { version = "4.6.1", features = ["derive", "env"] }
@@ -61,3 +61,13 @@ socket2 = "0.6.4"
 indexmap = "2.14.0"
 local-ip-address = "0.6.13"
 sysinfo = { version = "0.39", default-features = false, features = ["network", "system"] }
+rcgen = "0.13"
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pki-types = { version = "1", features = ["alloc"] }
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["server", "http1", "tokio"] }
+http-body-util = "0.1"
+http = "1"
+time = "0.3"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }

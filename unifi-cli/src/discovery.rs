@@ -58,11 +58,11 @@ pub enum DiscoveryCommand {
     /// Listen for incoming discovery queries and respond as a simulated device.
     Listen {
         /// MAC address to advertise (e.g. "AA:BB:CC:DD:EE:FF").
-        /// Defaults to the first non-loopback network interface.
+        /// Defaults to the MAC of the default-route interface.
         #[arg(long, env = "UNIFI_DISCOVERY_MAC")]
         mac: Option<String>,
 
-        /// IP address to advertise. Defaults to the first non-loopback IPv4 address.
+        /// IP address to advertise. Defaults to the IP of the default-route interface.
         #[arg(long, env = "UNIFI_DISCOVERY_IP")]
         ip: Option<Ipv4Addr>,
 

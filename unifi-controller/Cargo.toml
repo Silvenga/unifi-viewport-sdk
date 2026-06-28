@@ -1,0 +1,35 @@
+[package]
+name = "unifi-controller"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Controller-side implementation of the Ubiquiti Protect adoption flow"
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme = "../README.md"
+keywords = ["unifi", "ubiquiti", "protect", "adoption", "controller"]
+categories = ["api-bindings", "network-programming"]
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "unifi_controller"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+assert_matches = "1.5.0"
+unifi-device-viewport = { path = "../unifi-device-viewport" }
+tokio = { workspace = true, features = ["test-util"] }

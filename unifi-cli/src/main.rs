@@ -1,6 +1,7 @@
 //! CLI tool for UniFi Protect protocol testing and debugging.
 
 mod cli;
+mod device;
 mod discovery;
 use cli::{parse_args, Command};
 use std::process::ExitCode;
@@ -23,5 +24,6 @@ async fn main() -> ExitCode {
 
     match cli.command {
         Command::Discovery { command, args } => discovery::run(command, &args).await,
+        Command::Device { command } => device::run(command).await,
     }
 }

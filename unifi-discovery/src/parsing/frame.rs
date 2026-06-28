@@ -153,11 +153,11 @@ mod tests {
     }
 
     #[test]
-    fn when_parse_post_adoption_then_nvr_hardware_id_present() {
+    fn when_parse_post_adoption_then_controller_id_present() {
         let frame = Frame::parse(POST_ADOPTION_FRAME).unwrap();
-        let nvr_hw_id = frame.values.get_first(0x26).unwrap();
+        let controller_id = frame.values.get_first(0x26).unwrap();
         assert_eq!(
-            nvr_hw_id,
+            controller_id,
             &[
                 0x53, 0x54, 0x0e, 0xa4, 0xb5, 0x20, 0x51, 0x2c, 0xaf, 0x90, 0xef, 0x08, 0xf1, 0x0e,
                 0xb2, 0xaa

@@ -20,7 +20,7 @@ async fn when_responder_listens_then_client_discovers_device() {
     info.set_hostname("TestDevice");
     info.set_platform("TestPlatform");
     info.set_is_default(true);
-    info.set_guid("550e8400-e29b-41d4-a716-446655440000");
+    info.set_anonymous_id("550e8400-e29b-41d4-a716-446655440000");
 
     let responder = DiscoveryResponder::new(move || DiscoveryMessage::InfoResponse(info.clone()))
         .with_port(TEST_PORT)
@@ -59,7 +59,7 @@ async fn when_responder_listens_then_client_discovers_device() {
     assert_eq!(discovered.get_platform().unwrap(), "TestPlatform");
     assert!(discovered.get_is_default().unwrap().unwrap());
     assert_eq!(
-        discovered.get_guid().unwrap(),
+        discovered.get_anonymous_id().unwrap(),
         "550e8400-e29b-41d4-a716-446655440000"
     );
 }
