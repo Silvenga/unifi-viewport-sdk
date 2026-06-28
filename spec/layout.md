@@ -1,142 +1,28 @@
-# Camera Layout
+# ViewPort Camera Layout
 
-These are the layouts as shown in the Protect console. Each layout is hardcoded. Layouts 1-16 appear to be supported.
+> Status: Complete + Validated
 
-> The actual stream locations aren't known yet (requires some amount of testing).
-> The numbers are purely here to show which sections are different cameras.
+These are the layouts as shown in the Protect console. Each layout is hardcoded in the ViewPort (which is why they can't
+be customized). The order of the cameras in each layout maps 1:1 to the order of the cameras in the configuration
+received from the Protect console. Everything assumes a 16:9 aspect ratio.
 
-**1**
+| #  | Layout                                                                                                                                                           | Notes                                                                                                                                                            |
+|----|------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1  | <pre>1</pre>                                                                                                                                                     | This is the only layout that enables the speaker.                                                                                                                |
+| 2  | <pre>1 \| 2</pre>                                                                                                                                                |                                                                                                                                                                  |
+| 3  | <pre>1 \| 2<br>  \| 3</pre>                                                                                                                                      |                                                                                                                                                                  |
+| 4  | <pre>1 \| 2<br>3 \| 4</pre>                                                                                                                                      |                                                                                                                                                                  |
+| 5  | <pre>1     \| 2 \| 3<br>      \| 4 \| 5</pre>                                                                                                                    |                                                                                                                                                                  |
+| 6  | <pre>1     \| 2<br>      \| 3<br>4 \| 5 \| 6</pre>                                                                                                               |                                                                                                                                                                  |
+| 7  | <pre>1     \| 2<br>      \|<br>3     \| 4 \| 5<br>      \| 6 \| 7</pre>                                                                                          |                                                                                                                                                                  |
+| 8  | <pre>1   \| 2   \| 3<br>    \|     \| 4<br>5   \| 6   \| 7<br>    \|     \| 8</pre>                                                                              |                                                                                                                                                                  |
+| 9  | <pre>1  \| 2  \| 3<br>4  \| 5  \| 6<br>7  \| 8  \| 9</pre>                                                                                                       |                                                                                                                                                                  |
+| 10 | <pre>1       \| 2  \| 3<br>        \| 4  \| 5<br>6       \| 7  \| 8<br>        \| 9  \| 10</pre>                                                                 |                                                                                                                                                                  |
+| 11 | <pre>1       \| 2       \| 3<br>        \|         \| 4<br>5       \| 6  \| 7  \| 8<br>        \| 9  \| 10 \| 11</pre>                                           |                                                                                                                                                                  |
+| 12 | <pre>1           \| 2<br>            \|<br>            \|<br>3           \| 4  \| 5  \| 6<br>            \| 7  \| 8  \| 9<br>            \| 10 \| 11 \| 12</pre> |                                                                                                                                                                  |
+| 13 | <pre>1       \| 2  \| 3<br>        \| 4  \| 5<br>6  \| 7  \| 8  \| 9<br>10 \| 11 \| 12 \| 13</pre>                                                               |                                                                                                                                                                  |
+| 14 | <pre>1     \| 2  \| 3  \| 4<br>      \| 5  \| 6  \| 7<br>8     \| 9  \| 10 \| 11<br>      \| 12 \| 13 \| 14</pre>                                                |                                                                                                                                                                  |
+| 15 | <pre>1             \| 2<br>              \|<br>3     \| 4     \| 7  \| 8  \| 9<br>5     \| 6     \| 10 \| 11 \| 12<br>              \| 13 \| 14 \| 15</pre>      | This one is a bit weird, 1 and 2 are the same size (half of the view). The cell for [3/4/5/6] is the same size as [10/11/12/13/14/15]. So not perfect divisions. |
+| 16 | <pre>1  \| 2  \| 3  \| 4<br>5  \| 6  \| 7  \| 8<br>9  \| 10 \| 11 \| 12<br>13 \| 14 \| 15 \| 16</pre>                                                            |                                                                                                                                                                  |
 
-```
-1
-```
-
-**2**
-
-```
-1 | 2
-```
-
-**3**
-
-```
-1 | 2
-  | 3
-```
-
-**4**
-
-```
-1 | 2
-3 | 4
-```
-
-**5**
-
-```
-1     | 2 | 3
-      | 4 | 5
-```
-
-**6**
-
-```
-1     | 2
-      | 3
-4 | 5 | 6
-```
-
-**7**
-
-```
-1     | 2
-      |
-3     | 4 | 5
-      | 6 | 7
-```
-
-**8**
-
-```
-1   | 2   | 3
-    |     | 4
-5   | 6   | 7
-    |     | 8
-```
-
-**9**
-
-```
-1  | 2  | 3
-4  | 5  | 6
-7  | 8  | 9
-```
-
-**10**
-
-```
-1      | 2  | 3
-       | 4  | 5
-6      | 7  | 8
-       | 9  | 10
-```
-
-**11**
-
-```
-1       | 2       | 3
-        |         | 4
-5       | 6  | 7  | 8
-        | 9  | 10 | 11
-```
-
-**12**
-
-```
-1           | 2
-            |
-            |
-3           | 4  | 5  | 6
-            | 7  | 8  | 9
-            | 10 | 11 | 12
-```
-
-**13**
-
-```
-1       | 2  | 3
-        | 4  | 5
-6  | 7  | 8  | 9
-10 | 11 | 12 | 13
-```
-
-**14**
-
-```
-1    | 2  | 3  | 4
-     | 5  | 6  | 7
-8    | 9  | 10 | 11
-     | 12 | 13 | 14
-```
-
-**15**
-
-```
-1            | 2
-             |
-3     | 4    | 7  | 8  | 9
-5     | 6    | 10 | 11 | 12
-             | 13 | 14 | 15
-```
-
-> This one is a bit weird, 1 and 2 are the same size (half of the view). The cell for [3/4/5/6] is the same size
-> as [10/11/12/13/14/15]. So not perfect divisions.
-
-**16**
-
-```
-1  | 2  | 3  | 4
-5  | 6  | 7  | 8
-9  | 10 | 11 | 12
-13 | 14 | 15 | 16
-```
+> You don't know how annoying it was to make these into a table using markdown...

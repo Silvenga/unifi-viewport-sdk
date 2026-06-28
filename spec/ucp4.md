@@ -59,7 +59,7 @@ The device connects to the NVR on port 7442. The following headers were observed
 |----------------------------|----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------|
 | `Sec-WebSocket-Protocol`   | `ucp4`                                 | Main control channel. `updates` for the push channel.                                                                                |
 | `x-ident`                  | `E4388334091E`                         | Device MAC address (no separators)                                                                                                   |
-| `x-mode`                   | `0`                                    |                                                                                                                                      |
+| `x-mode`                   | `0`                                    | Appears required and must be set to `0`. Maybe a protocol version?                                                                   |
 | `x-type`                   | `UP Viewport`                          | Device type string                                                                                                                   |
 | `x-sysid`                  | `0xe980`                               | Observed in UNVR logs; not in the plaintext capture                                                                                  |
 | `x-token`                  | `HiCnv4x4OYoN4wb446C2QbIbPPIWpLOk`     | Adoption token. Observed on first connection with `x-adopted: false`. Not observed on subsequent connections with `x-adopted: true`. |

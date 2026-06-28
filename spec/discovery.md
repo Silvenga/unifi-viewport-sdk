@@ -1,5 +1,7 @@
 # UniFi Protect Device Discovery Protocol (UDP 10001)
 
+> Status: Incomplete, there's a lot of other commands that can be sent.
+
 > Raw frames captured from a real ViewPort (UP Viewport, firmware `1.4.33`) adopting against a UNVR running Protect
 > 7.1.83 / UniFi OS 5.1.19.
 
@@ -96,25 +98,25 @@ is valid.
 
 **TLV Types**
 
-The following types were observed in the ViewPort's discovery response frames.
+The following types are relevent to the ViewPort:
 
-| Type   | Name                   | Len (bytes) | Value format                                                               |
-|--------|------------------------|-------------|----------------------------------------------------------------------------|
-| `0x01` | MAC Address            | 6           | Raw MAC                                                                    |
-| `0x02` | MAC + IP               | 10          | 6-byte MAC + 4-byte IPv4                                                   |
-| `0x03` | Firmware Version       | variable    | ASCII string                                                               |
-| `0x0A` | Uptime                 | 4           | Big-endian uint32, seconds                                                 |
-| `0x0B` | Hostname               | variable    | ASCII string                                                               |
-| `0x0C` | Platform / Short Model | variable    | ASCII string                                                               |
-| `0x0F` | Unknown                | 4           | Constant `0x00011F90` in all captures                                      |
-| `0x10` | Unknown                | 2           | `0x80E9` in all captures (see note in Key observations)                    |
-| `0x17` | Is Default             | 4           | uint32: `0x00000001` = factory default / unadopted, `0x00000000` = adopted |
-| `0x20` | GUID                   | 36          | ASCII UUID string                                                          |
-| `0x2B` | Device ID              | 16          | Binary (16-byte) value                                                     |
-| `0x2C` | Unknown                | 1           | Constant `0x03` in all captures                                            |
-| `0x26` | NVR Hardware ID        | 16          | Binary; present only while adopted (`0x17 = 0`)                            |
+| Type   | Name                | Len (Bytes) | Value Format                                                                                                                                                                                                                                           | When Present |
+|--------|---------------------|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
+| `0x01` | MAC Address         | 6           | Raw MAC bytes                                                                                                                                                                                                                                          | Always       |
+| `0x02` | MAC + IP            | 10          | 6-byte MAC + 4-byte IPv4                                                                                                                                                                                                                               | Always       |
+| `0x03` | Firmware Version    | var         | ASCII string: `UPV.qcs605.v1.4.33.0.4698daf26.260416.1114`                                                                                                                                                                                             | Always       |
+| `0x0A` | Uptime              | 4           | Big-endian uint32, seconds since boot                                                                                                                                                                                                                  | Always       |
+| `0x0B` | Hostname            | var         | ASCII string: `UP Viewport`                                                                                                                                                                                                                            | Always       |
+| `0x0C` | Platform            | var         | ASCII string: `UP Viewport`                                                                                                                                                                                                                            | Always       |
+| `0x17` | Is Default          | 4           | uint32: `0x00000001` = unadopted, `0x00000000` = adopted                                                                                                                                                                                               | Always       |
+| `0x2C` | Default Credentials | 1           | Bitfield: bit 0 = ubnt supported, bit 1 = ui supported. Value `0x03` = both. Default credentials are what the device accepts on it's management API. This password is changed to the device password found in the Protoct Console soon after adoption. | Always       |
+| `0x10` | System ID           | 2           | `0x80E9` (byte swap of `0xE980`, which is sent in the `x-sysid` header). This appears to be the the device type id, e.g., `0xec65` is for the UA-Intercom-Viewer.                                                                                      | Always       |
+| `0x0F` | Signal              | 4           | `0x00011F90` (constant). No idea what this is for.                                                                                                                                                                                                     | Always       |
+| `0x20` | Anonymous ID        | 36          | ASCII UUID string                                                                                                                                                                                                                                      | Always       |
+| `0x2B` | GUID                | 16          | Binary 16 bytes of `1385fe74-06ad-496f-933e-c1785e3d7947`. This is hardcoded into the Protect ViewPort's APK.                                                                                                                                          | Always       |
+| `0x26` | Controller ID       | 16          | Binary 16-byte NVR hardware ID                                                                                                                                                                                                                         | Adopted only |
 
-> Not observed on this device: types `0x13` (Serial) and `0x14` (Model / Full Name) are referenced in
+> Not observed on the device: types `0x13` (Serial) and `0x14` (Model / Full Name) are referenced in
 > the [HN thread](https://news.ycombinator.com/item?id=47308278) and the camera discovery protocol but do not appear in
 > any captured ViewPort frame.
 

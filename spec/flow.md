@@ -1,5 +1,7 @@
 # Adoption Flow
 
+> Status: Incomplete, must mostly here.
+
 ```mermaid
 sequenceDiagram
     participant Device as ViewPort
@@ -13,8 +15,8 @@ sequenceDiagram
         Note over Device,NVR8080: Discovery & Adoption Token Push
         Device->>DS: UDP 10001 discovery broadcast<br/>(TLV: MAC, IP, firmware, type, sysid, is_default=0x01)
         Note right of Device: Repeats every ~10s
-        NVR8080->>Device: TCP :8080 (TLS) — NVR initiates connection
-        NVR8080->>Device: Push adoption info (TLS encrypted, not decoded)
+        NVR8080->>Device: TCP :8080 (TLS) - NVR initiates connection
+        NVR8080->>Device: Push adoption info (TLS encrypted)
         Note over Device: Device receives NVR address + adoption token
     end
 
@@ -22,7 +24,6 @@ sequenceDiagram
         Note over Device,Backend: WebSocket Connection (ucp4)
         Device->>DS: WSS :7442/ (TLS, client cert)<br/>Sec-WebSocket-Protocol: ucp4<br/>x-ident, x-type, x-sysid, x-mode, x-token, x-adopted: false
         DS->>Backend: WS :7448/ws (plaintext)<br/>Forwards all headers + x-fingerprint
-        Note over Backend: verifyUcpClient: validates token,<br/>pins cert fingerprint, sets isAdopted=true
     end
 
     rect rgb(248, 255, 248)
