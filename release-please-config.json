@@ -1,0 +1,7 @@
+{
+  "packages": {
+    "unifi-cli": {
+      "release-type": "rust"
+    }
+  }
+}

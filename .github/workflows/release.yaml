@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs['unifi-cli--release_created'] }}
+      tag_name: ${{ steps.release.outputs['unifi-cli--tag_name'] }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+
+  upload-linux:
+    name: Build (Linux)
+    runs-on: ubuntu-latest
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: Mozilla-Actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
+      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
+        with:
+          toolchain: stable
+      - name: Ensure cross is installed
+        run: cargo install cross
+      - name: Build
+        run: cross build -p unifi-cli --target x86_64-unknown-linux-gnu --release
+      - name: Upload Release Artifact
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ needs.release-please.outputs.tag_name }} target/x86_64-unknown-linux-gnu/release/unifi-cli --clobber
+
+  upload-windows:
+    name: Build (Windows)
+    runs-on: windows-latest
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: Mozilla-Actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
+      - uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1.16.1
+        with:
+          toolchain: stable
+      - name: Build
+        run: cargo build -p unifi-cli --release
+      - name: Upload Release Artifact
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload ${{ needs.release-please.outputs.tag_name }} target/release/unifi-cli.exe --clobber
