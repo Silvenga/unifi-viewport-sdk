@@ -27,9 +27,9 @@ const DEFAULT_MANAGEMENT_PASSWORD: &str = "ubnt";
 /// Builder for the device-side HTTP server over TLS 1.3.
 ///
 /// Routes are dispatched to individual route handlers. Currently supports:
-/// - `POST /api/adopt` — adoption endpoint (see [`crate::routes::handle_adoption`]).
-/// - `POST /api/info` — device info query (see [`crate::routes::handle_info`]).
-/// - `POST /api/settings` — management settings (see [`crate::routes::handle_settings`]).
+/// - `POST /api/adopt` — adoption endpoint.
+/// - `POST /api/info` — device info query.
+/// - `POST /api/settings` — management settings.
 ///
 /// # Defaults
 /// - Port: `8080`

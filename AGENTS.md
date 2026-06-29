@@ -120,8 +120,12 @@ use thiserror::Error;
 
 ### Verification
 
-- Use `cargo fmt`, `cargo clippy`, and `cargo test` to verify correctness.
-- Use `scripts/check_use_groups.sh` to validate `use` groups formatting.
+- Always use these commands to verify correctness:
+    - `cargo fmt`
+    - `cargo clippy`
+    - `cargo test`
+    - `cargo doc --no-deps`
+    - `scripts/check_use_groups.sh`
 
 ## Constraints
 
