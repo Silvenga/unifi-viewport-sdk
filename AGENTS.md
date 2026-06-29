@@ -1,4 +1,11 @@
-# Global Coding Conventions
+# unifi-viewport-sdk
+
+Goal: Implement a RUST SDK that can mimic a Ubiquiti Unifi Protect ViewPort that can be discovered, adopted, and
+configured by a Protect console. For testing the ViewPort device SDK, a minimal controller implementation will also be
+created.
+
+The `spec/` folder contains the specification the SDK is being built against. The `docs/` folder should be updated to
+reflect the changes made to the SDK.
 
 ### SDK Conventions
 
@@ -107,6 +114,9 @@ use thiserror::Error;
 - Name tests using `when_<condition>_then_<action>_should_<expected>` convention.
 - Structure tests in Arrange-Act-Assert (AAA) form. Do not add `// Arrange`, `// Act`, `// Assert` comments - use blank
   lines to separate the sections.
+- Unit tests should be created for new code and updated when migrating old code.
+- Integration tests should be created using the minimal controller code to verify the SDK's functionality.
+- Tests should not rely on real hardware (which is why we are building a minimal controller).
 
 ### Verification
 

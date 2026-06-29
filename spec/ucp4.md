@@ -447,16 +447,16 @@ Two `configure` payloads were captured - one for a 16-camera grid layout and one
 
 #### `liveview`
 
-| Field       | Value       | Notes                                                  |
-|-------------|-------------|--------------------------------------------------------|
-| `name`      | `View Port` | Ignored by device                                      |
-| `isDefault` | `false`     | Ignored by device                                      |
-| `isGlobal`  | `false`     | Ignored by device                                      |
-| `layout`    | `7`         | Layout type code - see [layout reference](./layout.md) |
-| `slots`     | [...]       | See below. Required.                                   |
-| `owner`     | (present)   | Ignored by device                                      |
-| `id`        | (present)   | Ignored by device                                      |
-| `modelKey`  | (present)   | Ignored by device                                      |
+| Field       | Value       | Notes                                                         |
+|-------------|-------------|---------------------------------------------------------------|
+| `name`      | `View Port` | Ignored by device                                             |
+| `isDefault` | `false`     | Ignored by device                                             |
+| `isGlobal`  | `false`     | Ignored by device                                             |
+| `layout`    | `7`         | Layout type code - see [layout reference](viewport-layout.md) |
+| `slots`     | [...]       | See below. Required.                                          |
+| `owner`     | (present)   | Ignored by device                                             |
+| `id`        | (present)   | Ignored by device                                             |
+| `modelKey`  | (present)   | Ignored by device                                             |
 
 ##### Slot Object
 
