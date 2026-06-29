@@ -1,6 +1,6 @@
 # Adoption Flow
 
-> Status: Incomplete, must mostly here.
+> Status: Complete for the happy path. Error / retry paths are not fully captured.
 
 ```mermaid
 sequenceDiagram
@@ -12,12 +12,12 @@ sequenceDiagram
     Note over Device: Device boots, enters factory-default state
 
     rect rgb(240, 248, 255)
-        Note over Device,NVR8080: Discovery & Adoption Token Push
+        Note over Device,NVR8080: Discovery & Adoption
         Device->>DS: UDP 10001 discovery broadcast<br/>(TLV: MAC, IP, firmware, type, sysid, is_default=0x01)
         Note right of Device: Repeats every ~10s
-        NVR8080->>Device: TCP :8080 (TLS) - NVR initiates connection
-        NVR8080->>Device: Push adoption info (TLS encrypted)
-        Note over Device: Device receives NVR address + adoption token
+        NVR8080->>Device: POST https://{device}:8080/api/adopt<br/>(TLS, no server cert verification)<br/>Body: {hosts, token, protocol, nvr, consoleId, consoleName, ...}
+        Note right of Device: Device stores hosts, token, nvr,<br/>protocol, consoleId in persistent state.<br/>Returns 200 "Success" (text/plain).<br/>Controller only checks 200 status, does not parse body.
+        Note over Device: Device starts WebSocket client connecting<br/>to wss://{firstHost}:7442
     end
 
     rect rgb(255, 250, 240)
@@ -52,16 +52,16 @@ sequenceDiagram
 
     rect rgb(240, 255, 240)
         Note over Device,DS: Updates Channel (second WebSocket)
-        Device->>DS: WSS :7442/?lastUpdateId=...<br/>Sec-WebSocket-Protocol: updates<br/>Same x-ident, x-type, x-mode headers
+        Device->>DS: WSS :7442/?lastUpdateId=...<br/>Sec-WebSocket-Protocol: updates<br/>Same x-ident, x-type, x-mode headers<br/>(no x-guid on this channel)
         DS->>Backend: WS :7448/ws (plaintext)
-        Note over Device,Backend: Push notifications for device state changes<br/>(update messages with modifiedKeys)
+        Note over Device,Backend: Push notifications for camera state changes<br/>(update messages with modelKey="camera", modifiedKeys)
     end
 
     rect rgb(255, 240, 240)
         Note over Device: Stream Pull (port 7446)
         Device->>DS: WSS :7446/{alias}?type=ubv
-        DS-->>Device: Camera livestream data
+        DS-->>Device: Camera livestream data (ubv frames)
     end
 
-    Note over Device: Discovery continues (is_default=0x00,<br/>includes NVR hardware ID TLV)
+    Note over Device: Discovery continues (is_default=0x00,<br/>includes controller ID TLV 0x26)
 ```

@@ -1,9 +1,10 @@
 # UniFi Protect Device Discovery Protocol (UDP 10001)
 
-> Status: Incomplete, there's a lot of other commands that can be sent.
+> Status: Incomplete - there are likely other commands that can be sent, but the `CMD_INFO` query/response is fully
+> decoded.
 
 > Raw frames captured from a real ViewPort (UP Viewport, firmware `1.4.33`) adopting against a UNVR running Protect
-> 7.1.83 / UniFi OS 5.1.19.
+> 7.1.83 / UniFi OS 5.1.19. Field semantics cross-validated against decompiled firmware source.
 
 ## Overview
 
@@ -25,6 +26,28 @@ TLV reply to each of them independently.
 
 Devices join the multicast group `233.89.188.1` (observed via IGMPv3 membership reports to `224.0.0.22`) so they receive
 queries sent to the group.
+
+### Device-Side Listen Socket
+
+The device binds UDP port 10001 on all interfaces with the following socket options:
+
+- Join multicast group `233.89.188.1`
+- `SO_REUSEADDR = true`
+- `SO_TIMEOUT = 5000` (5 seconds)
+
+### Query Validation (Device Side)
+
+The device only responds to a query that satisfies all of:
+
+1. Exactly 4 bytes: `{0x01, 0x00, 0x00, 0x00}` (version `0x01`, command `CMD_INFO`, empty TLV section).
+2. Source IP is in a private / test range:
+    - `10.0.0.0/8`
+    - `172.16.0.0/12`
+    - `192.168.0.0/16`
+    - `169.254.0.0/16` (link-local)
+    - `1.2.3.0/24` (test range)
+
+Frames with a non-empty TLV section are treated as announcements / other commands and do not trigger a response.
 
 ### Query
 
@@ -52,9 +75,6 @@ The query is a 4-byte header with an empty TLV section:
 | 1      | 1    | command | `0x00`   | `CMD_INFO` (request device info) |
 | 2      | 2    | length  | `0x0000` | TLV section length = 0 (empty)   |
 
-The device only responds to an empty `CMD_INFO` query (command `0x00`, length `0`). Frames with a non-empty TLV section
-are treated as announcements/other commands and do not appear to trigger a response.
-
 ### Response
 
 - Direction: `device -> controller`
@@ -80,45 +100,57 @@ follows.
 The header length matches the captured frames exactly: pre-adoption `0x00B7` (183) + 4-byte header = 187 bytes;
 post-adoption `0x00CA` (202) + 4 = 206 bytes.
 
-**TLV Entry**
+### TLV Entry
 
 Each TLV entry has a 3-byte header followed by the value:
 
-| Offset | Size | Field    | Notes                                                                                              |
-|--------|------|----------|----------------------------------------------------------------------------------------------------|
-| 0      | 1    | type     | TLV type code                                                                                      |
-| 1      | 1    | reserved | Always `0x00` in every captured TLV (likely the high byte of a 2-byte type field, or a flags byte) |
-| 2      | 1    | length   | Length of the value in bytes (uint8)                                                               |
-| 3      | *n*  | value    | `length` bytes                                                                                     |
+| Offset | Size | Field  | Notes                                           |
+|--------|------|--------|-------------------------------------------------|
+| 0      | 1    | type   | TLV type code                                   |
+| 1      | 2    | length | Big-endian uint16, length of the value in bytes |
+| 3      | *n*  | value  | `length` bytes                                  |
+
+> The 3-byte TLV header matches the 4-byte payload header's length encoding (big-endian uint16 at offset 2). The
+> previously documented `type(1) + reserved_0x00(1) + length_uint8(1)` encoding decodes every captured frame to the
+> same bytes - all observed values are shorter than 256 bytes - but is inconsistent with the payload header. The
+> `length` is treated as a uint16 here. An implementer should emit `0x00` for the high byte of `length` whenever
+> `length <= 255`, which makes the two encodings byte-compatible for all observed frames.
 
 This encoding parses both captured frames cleanly to the exact byte. For example, the first TLV
-`01 00 06 e4 38 83 34 09 1e` decodes as type `0x01`, reserved `0x00`, length `6`, value `e4388334091e` (the MAC). The
-reserved byte is `0x00` for all TLVs observed; an implementer should emit `0x00` and should not assume any other value
-is valid.
+`01 00 06 e4 38 83 34 09 1e` decodes as type `0x01`, length `0x0006`, value `e4388334091e` (the MAC).
 
 **TLV Types**
 
-The following types are relevent to the ViewPort:
+The following types are relevant to the ViewPort:
 
-| Type   | Name                | Len (Bytes) | Value Format                                                                                                                                                                                                                                           | When Present |
-|--------|---------------------|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
-| `0x01` | MAC Address         | 6           | Raw MAC bytes                                                                                                                                                                                                                                          | Always       |
-| `0x02` | MAC + IP            | 10          | 6-byte MAC + 4-byte IPv4                                                                                                                                                                                                                               | Always       |
-| `0x03` | Firmware Version    | var         | ASCII string: `UPV.qcs605.v1.4.33.0.4698daf26.260416.1114`                                                                                                                                                                                             | Always       |
-| `0x0A` | Uptime              | 4           | Big-endian uint32, seconds since boot                                                                                                                                                                                                                  | Always       |
-| `0x0B` | Hostname            | var         | ASCII string: `UP Viewport`                                                                                                                                                                                                                            | Always       |
-| `0x0C` | Platform            | var         | ASCII string: `UP Viewport`                                                                                                                                                                                                                            | Always       |
-| `0x17` | Is Default          | 4           | uint32: `0x00000001` = unadopted, `0x00000000` = adopted                                                                                                                                                                                               | Always       |
-| `0x2C` | Default Credentials | 1           | Bitfield: bit 0 = ubnt supported, bit 1 = ui supported. Value `0x03` = both. Default credentials are what the device accepts on it's management API. This password is changed to the device password found in the Protoct Console soon after adoption. | Always       |
-| `0x10` | System ID           | 2           | `0x80E9` (byte swap of `0xE980`, which is sent in the `x-sysid` header). This appears to be the the device type id, e.g., `0xec65` is for the UA-Intercom-Viewer.                                                                                      | Always       |
-| `0x0F` | Signal              | 4           | `0x00011F90` (constant). No idea what this is for.                                                                                                                                                                                                     | Always       |
-| `0x20` | Anonymous ID        | 36          | ASCII UUID string                                                                                                                                                                                                                                      | Always       |
-| `0x2B` | GUID                | 16          | Binary 16 bytes of `1385fe74-06ad-496f-933e-c1785e3d7947`. This is hardcoded into the Protect ViewPort's APK.                                                                                                                                          | Always       |
-| `0x26` | Controller ID       | 16          | Binary 16-byte NVR hardware ID                                                                                                                                                                                                                         | Adopted only |
+| Type   | Name                | Len (Bytes) | Value Format                                                                                                                                                                                                                                            | When Present |
+|--------|---------------------|-------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------|
+| `0x01` | MAC Address         | 6           | Raw MAC bytes                                                                                                                                                                                                                                           | Always       |
+| `0x02` | MAC + IP            | 10          | 6-byte MAC + 4-byte IPv4                                                                                                                                                                                                                                | Always       |
+| `0x03` | Firmware Version    | var         | ASCII string: `UPV.qcs605.v1.4.33.0.4698daf26.260416.1114`                                                                                                                                                                                              | Always       |
+| `0x0A` | Uptime              | 4           | Big-endian uint32, seconds since boot                                                                                                                                                                                                                   | Always       |
+| `0x0B` | Hostname            | var         | ASCII string: `UP Viewport`                                                                                                                                                                                                                             | Always       |
+| `0x0C` | Platform            | var         | ASCII string: `UP Viewport`                                                                                                                                                                                                                             | Always       |
+| `0x17` | Is Default          | 4           | uint32: `0x00000001` = unadopted, `0x00000000` = adopted. `is_default = !isAdopted ? 1 : 0`.                                                                                                                                                            | Always       |
+| `0x2C` | Default Credentials | 1           | Bitfield: bit 0 = `ubnt` supported, bit 1 = `ui` supported. Value `0x03` = both. These are the credentials the device accepts on its management API (port 8080); the password is replaced by the Protect Console's device password soon after adoption. | Always       |
+| `0x10` | System ID           | 2           | `0x80E9` - byte-swap of `0xE980`, which is sent in the `x-sysid` header over WebSocket. This is the device type id; e.g. `0xec65` is the UA-Intercom-Viewer.                                                                                            | Always       |
+| `0x0F` | Signal              | 4           | `0x00011F90` (constant `73360`). Purpose unconfirmed.                                                                                                                                                                                                   | Always       |
+| `0x20` | Anonymous ID        | 36          | ASCII UUID string                                                                                                                                                                                                                                       | Always       |
+| `0x2B` | GUID                | 16          | Binary 16 bytes of `1385fe74-06ad-496f-933e-c1785e3d7947`. Hardcoded into the Protect ViewPort's APK - identical for all ViewPort devices on this firmware.                                                                                             | Always       |
+| `0x26` | Controller ID       | 16          | Binary 16-byte NVR hardware ID. Only included when adopted (the stored NVR hardware ID is non-null).                                                                                                                                                    | Adopted only |
 
 > Not observed on the device: types `0x13` (Serial) and `0x14` (Model / Full Name) are referenced in
 > the [HN thread](https://news.ycombinator.com/item?id=47308278) and the camera discovery protocol but do not appear in
 > any captured ViewPort frame.
+
+### TLV Construction Order
+
+The device builds TLVs in this order:
+
+1. **Common TLVs:** MAC (`0x01`), MAC+IP (`0x02`), Firmware (`0x03`), Uptime (`0x0A`), Hostname (`0x0B`),
+   Platform (`0x0C`), Is Default (`0x17`), Default Credentials (`0x2C`).
+2. **Device-specific TLVs:** System ID (`0x10`), Signal (`0x0F`), Anonymous ID (`0x20`), GUID (`0x2B`),
+   Controller ID (`0x26` if adopted).
 
 ## Examples
 
@@ -180,11 +212,11 @@ Captured at t+28.52s (before WebSocket adoption at t+185s).
 0b 00 0b 55502056696577706f7274                                                                # 0x0B hostname "UP Viewport"
 0c 00 0b 55502056696577706f7274                                                                # 0x0C platform "UP Viewport"
 17 00 04 00000001                                                                              # 0x17 is_default = 1 (unadopted)
-2c 00 01 03                                                                                    # 0x2C unknown
-10 00 02 80e9                                                                                  # 0x10 unknown
-0f 00 04 00011f90                                                                              # 0x0F unknown
-20 00 24 37663963393061322d383135322d356436332d323134622d643936643664383934623166              # 0x20 GUID
-2b 00 10 1385fe7406ad496f933ec1785e3d7947                                                      # 0x2B device id
+2c 00 01 03                                                                                    # 0x2C default credentials: ubnt+ui
+10 00 02 80e9                                                                                  # 0x10 system id (0x80E9)
+0f 00 04 00011f90                                                                              # 0x0F signal (constant)
+20 00 24 37663963393061322d383135322d356436332d323134622d643936643664383934623166              # 0x20 anonymous id (UUID)
+2b 00 10 1385fe7406ad496f933ec1785e3d7947                                                      # 0x2B GUID (hardcoded)
 ```
 
 ### Frame 2 - Post-adoption (206 bytes)
@@ -208,35 +240,34 @@ Captured at t+186.07s (after WebSocket adoption completed at t+185s).
 0b 00 0b 55502056696577706f7274                                                                # 0x0B hostname "UP Viewport"
 0c 00 0b 55502056696577706f7274                                                                # 0x0C platform "UP Viewport"
 17 00 04 00000000                                                                              # 0x17 is_default = 0 (adopted)
-2c 00 01 03                                                                                    # 0x2C unknown
-10 00 02 80e9                                                                                  # 0x10 unknown
-0f 00 04 00011f90                                                                              # 0x0F unknown
-20 00 24 37663963393061322d383135322d356436332d323134622d643936643664383934623166              # 0x20 GUID
-2b 00 10 1385fe7406ad496f933ec1785e3d7947                                                      # 0x2B device id
-26 00 10 53540ea4b520512caf90ef08f10eb2aa                                                      # 0x26 NVR hardware id (adopted only)
+2c 00 01 03                                                                                    # 0x2C default credentials: ubnt+ui
+10 00 02 80e9                                                                                  # 0x10 system id (0x80E9)
+0f 00 04 00011f90                                                                              # 0x0F signal (constant)
+20 00 24 37663963393061322d383135322d356436332d323134622d643936643664383934623166              # 0x20 anonymous id (UUID)
+2b 00 10 1385fe7406ad496f933ec1785e3d7947                                                      # 0x2B GUID (hardcoded)
+26 00 10 53540ea4b520512caf90ef08f10eb2aa                                                      # 0x26 controller id (adopted only)
 ```
 
 ### Example Fields Annotated
 
-Byte-exact decode of the raw frames above using the [TLV encoding](#tlv-encoding) (1-byte type, 1-byte
-reserved `0x00`, 1-byte length, then value). Offsets are byte offsets into the frame, pointing at the TLV
-type byte; `value offset` = type offset + 3.
+Byte-exact decode of the raw frames above using the [TLV encoding](#tlv-entry) (1-byte type, 2-byte big-endian length,
+then value). Offsets are byte offsets into the frame, pointing at the TLV type byte; `value offset` = type offset + 3.
 
-| Offset | Type   | Len | Hex Value                                                                              | Decoded Value                                                      |
-|--------|--------|-----|----------------------------------------------------------------------------------------|--------------------------------------------------------------------|
-| 4      | `0x01` | 6   | `e4388334091e`                                                                         | MAC: `E4:38:83:34:09:1E`                                           |
-| 13     | `0x02` | 10  | `e4388334091ec0a800c9`                                                                 | MAC + IP: `E4:38:83:34:09:1E` @ `192.168.0.201`                    |
-| 26     | `0x03` | 42  | `5550562e7163733630352e76312e342e33332e302e3436393864616632362e3236303431362e31313134` | Firmware: `UPV.qcs605.v1.4.33.0.4698daf26.260416.1114`             |
-| 71     | `0x0A` | 4   | `0000004e` (pre) / `00000059` (post)                                                   | Uptime: 78s (pre) / 89s (post)                                     |
-| 78     | `0x0B` | 11  | `55502056696577706f7274`                                                               | Hostname: `UP Viewport`                                            |
-| 92     | `0x0C` | 11  | `55502056696577706f7274`                                                               | Platform: `UP Viewport`                                            |
-| 106    | `0x17` | 4   | `00000001` (pre) / `00000000` (post)                                                   | Is Default: `true` (unadopted) / `false` (adopted)                 |
-| 113    | `0x2C` | 1   | `03`                                                                                   | Unknown (constant `0x03`)                                          |
-| 117    | `0x10` | 2   | `80e9`                                                                                 | Unknown (constant `0x80E9`; see Key observations)                  |
-| 122    | `0x0F` | 4   | `00011f90`                                                                             | Unknown (constant `0x00011F90` = 73360)                            |
-| 129    | `0x20` | 36  | `37663963393061322d383135322d356436332d323134622d643936643664383934623166`             | GUID: `7f9c90a2-8152-5d63-214b-d96d6d894b1f`                       |
-| 168    | `0x2B` | 16  | `1385fe7406ad496f933ec1785e3d7947`                                                     | Device ID (binary, 16 bytes)                                       |
-| 187    | `0x26` | 16  | `53540ea4b520512caf90ef08f10eb2aa`                                                     | NVR Hardware ID (post-adoption only; absent in pre-adoption frame) |
+| Offset | Type   | Len | Hex Value                                                                              | Decoded Value                                                    |
+|--------|--------|-----|----------------------------------------------------------------------------------------|------------------------------------------------------------------|
+| 4      | `0x01` | 6   | `e4388334091e`                                                                         | MAC: `E4:38:83:34:09:1E`                                         |
+| 13     | `0x02` | 10  | `e4388334091ec0a800c9`                                                                 | MAC + IP: `E4:38:83:34:09:1E` @ `192.168.0.201`                  |
+| 26     | `0x03` | 42  | `5550562e7163733630352e76312e342e33332e302e3436393864616632362e3236303431362e31313134` | Firmware: `UPV.qcs605.v1.4.33.0.4698daf26.260416.1114`           |
+| 71     | `0x0A` | 4   | `0000004e` (pre) / `00000059` (post)                                                   | Uptime: 78s (pre) / 89s (post)                                   |
+| 78     | `0x0B` | 11  | `55502056696577706f7274`                                                               | Hostname: `UP Viewport`                                          |
+| 92     | `0x0C` | 11  | `55502056696577706f7274`                                                               | Platform: `UP Viewport`                                          |
+| 106    | `0x17` | 4   | `00000001` (pre) / `00000000` (post)                                                   | Is Default: `true` (unadopted) / `false` (adopted)               |
+| 113    | `0x2C` | 1   | `03`                                                                                   | Default Credentials: `0x03` = `ubnt` + `ui` supported            |
+| 117    | `0x10` | 2   | `80e9`                                                                                 | System ID: `0x80E9` (byte-swap of `0xE980`, the `x-sysid` value) |
+| 122    | `0x0F` | 4   | `00011f90`                                                                             | Signal: `0x00011F90` (constant `73360`; purpose unconfirmed)     |
+| 129    | `0x20` | 36  | `37663963393061322d383135322d356436332d323134622d643936643664383934623166`             | Anonymous ID: `7f9c90a2-8152-5d63-214b-d96d6d894b1f`             |
+| 168    | `0x2B` | 16  | `1385fe7406ad496f933ec1785e3d7947`                                                     | GUID: `1385fe74-06ad-496f-933e-c1785e3d7947` (hardcoded in APK)  |
+| 187    | `0x26` | 16  | `53540ea4b520512caf90ef08f10eb2aa`                                                     | Controller ID: NVR hardware ID (post-adoption only)              |
 
 ### Uptime
 
@@ -252,26 +283,26 @@ The `0x0A` (uptime) field increments across packets, consistent with a live upti
 
 ### Observations
 
-1. `0x10` field = `80e9` - constant `0x80E9` across all captured frames. Purpose unconfirmed. The bytes
-   `0x80E9` are the byte-swap of `0xE980`, which matches the `x-sysid: 0xe980` value seen in the WebSocket
-   adoption (see [UCP4 WebSocket spec](./ucp4.md)) that classifies the device as `UP Viewport`. This
-   correspondence is suggestive but not verified against another device type or against source; treat the
-   "sysid" interpretation as a hypothesis, not a decoded field.
+1. `0x10` (System ID) = `0x80E9` - constant across all captured frames. The bytes `0x80E9` are the byte-swap of
+   `0xE980`, which matches the `x-sysid: 0xe980` value seen in the WebSocket adoption (see
+   [UCP4 WebSocket spec](./ucp4.md)) that classifies the device as `UP Viewport`. Other known sysids (e.g. `0xec65`
+   for the UA-Intercom-Viewer) confirm this is a device-type identifier.
 
-2. `0x17` (Is Default) is the 4-byte value `0x00000001` while the device is unadopted (factory default)
-   and `0x00000000` once adopted. A factory reset returns it to `0x00000001`. This is how the controller
-   knows whether a responding device is available for adoption.
+2. `0x17` (Is Default) is `0x00000001` while the device is unadopted (factory default) and `0x00000000` once adopted.
+   A factory reset returns it to `0x00000001`. This is how the controller knows whether a responding device is
+   available for adoption. Computed as `is_default = !isAdopted ? 1 : 0`.
 
-3. `0x26` (NVR Hardware ID) is present only while adopted - the 16-byte value
-   `53540ea4b520512caf90ef08f10eb2aa` matches a value observed in UNVR logs. It is absent in factory-default
-   responses (`0x17 = 0x01`) and present once adopted (`0x17 = 0x00`).
+3. `0x26` (Controller ID) is present only while adopted - the 16-byte value `53540ea4b520512caf90ef08f10eb2aa`
+   matches a value observed in UNVR logs. Absent in factory-default responses (`0x17 = 0x01`) and present once
+   adopted (`0x17 = 0x00`). Only emitted when the stored NVR hardware ID is non-null.
 
-4. `0x0F` field = `00011f90` - constant across all frames. Value `73360` decimal. Unknown purpose.
+4. `0x0F` (Signal) = `0x00011F90` - constant across all frames. Value `73360` decimal. Purpose unconfirmed.
 
-5. `0x2C` field = `0x03` - constant. Unknown purpose.
-
-6. Hostname and Platform are identical (`UP Viewport`) - the ViewPort doesn't differentiate these, unlike cameras
+5. Hostname and Platform are identical (`UP Viewport`) - the ViewPort does not differentiate these, unlike cameras
    which may have a different hostname from model name.
 
-7. No `0x13` (Serial) or `0x14` (Model) TLVs present - the ViewPort does not include serial number or full model
+6. No `0x13` (Serial) or `0x14` (Model) TLVs are present - the ViewPort does not include serial number or full model
    name in its discovery frames.
+
+7. GUID `0x2B` = `1385fe74-06ad-496f-933e-c1785e3d7947` is hardcoded in the APK and identical for all ViewPort
+   devices on this firmware. The Anonymous ID `0x20` is a per-device UUID (`7f9c90a2-...` here).

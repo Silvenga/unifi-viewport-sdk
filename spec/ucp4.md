@@ -42,13 +42,15 @@ See [discovery](./discovery.md).
 
 ### Step 2: NVR Pushes Adoption Info to Device (Port 8080)
 
-From the TLS capture, the NVR initiates a TCP connection to the device on port 8080 (TLS) before the device connects to
-the NVR on port 7442.
+After the user clicks "Adopt" in the Protect UI, the NVR opens a TLS connection to the device on port 8080 and sends
+`POST /api/adopt` with the adoption payload (`hosts`, `token`, `protocol`, `nvr`, `consoleId`, `consoleName`, plus
+`username` / `password` for management-API auth). The device stores the config, returns `200 "Success"`, and starts
+its WebSocket client. See [viewport-management.md](./viewport-management.md) for the full endpoint contract.
 
 ### Step 3: User Adopts Device
 
-The user adopts the device through the Protect UI. The adoption token reaches the device (likely via the port 8080 push
-in Step 2), and the device presents it on the WebSocket connection via the `x-token` header.
+The user adopts the device through the Protect UI. The adoption token reaches the device via the `POST /api/adopt`
+call in Step 2, and the device presents it on the WebSocket connection via the `x-token` header.
 
 ### Step 4: WebSocket Connection
 
@@ -101,43 +103,50 @@ After this sequence, the device opens a second WebSocket with `sec-websocket-pro
 
 ## Binary Framing Format
 
-UCP4 uses **binary WebSocket frames** (opcode 2). Each WebSocket frame contains UCP4 messages. Each UCP4 message
-consists of a **header part** followed by a **body part**, concatenated in the same WebSocket frame.
+UCP4 uses **binary WebSocket frames** (opcode 2). Each WebSocket frame contains one or more UCP4 messages. Each UCP4
+message consists of a **header part** followed by a **body part**, concatenated in the same WebSocket frame.
 
-### Header Part
+### Frame Part Layout
 
-| Offset | Size | Field     | Description                                        |
-|--------|------|-----------|----------------------------------------------------|
-| 0      | 1    | `type`    | `0x01` = header (message metadata)                 |
-| 1      | 1    | `subtype` | `0x01` = observed in all captures                  |
-| 2      | 4    | `padding` | Always `0x00000000` in all observed frames         |
-| 6      | 2    | `length`  | Big-endian uint16, length of the JSON that follows |
+Every part (header or body) starts with an 8-byte fixed prefix:
 
-Followed by `length` bytes of UTF-8 JSON containing the message metadata.
+| Offset | Size | Field          | Description                                                                 |
+|--------|------|----------------|-----------------------------------------------------------------------------|
+| 0      | 1    | `type`         | `0x01` = HEADER, `0x02` = BODY                                              |
+| 1      | 1    | `format`       | `0x01` = JSON, `0x02` = STRING, `0x03` = BINARY                             |
+| 2      | 1    | `isCompressed` | `0x00` = no, `0x01` = yes (zlib `Inflater` / `Deflater`)                    |
+| 3      | 1    | `reserved`     | Always `0x00`                                                               |
+| 4      | 4    | `length`       | Big-endian int32, length of the content that follows                        |
+| 8      | *N*  | `content`      | `length` bytes (decompress with zlib before parsing if `isCompressed=0x01`) |
 
-### Body Part
+A complete message = header part (`type=0x01`, `format=JSON`) + body part
+(`type=0x02`, `format=JSON` / `STRING` / `BINARY`).
 
-| Offset | Size | Field     | Description                                               |
-|--------|------|-----------|-----------------------------------------------------------|
-| 0      | 1    | `type`    | `0x02` = body (payload)                                   |
-| 1      | 1    | `subtype` | `0x01` = JSON payload, `0x02` = plain text (log messages) |
-| 2      | 4    | `padding` | Always `0x00000000` in all observed frames                |
-| 6      | 2    | `length`  | Big-endian uint16, length of the JSON that follows        |
+> **Compatibility note.** A previous reading of the same bytes parsed the prefix as
+> `type(1) + subtype(1) + padding_4_zeros(4) + length_uint16_BE(2)`. Both interpretations decode every captured frame
+> identically — in all observed parts `isCompressed=0`, `reserved=0`, and `length < 65536`, so the high two bytes of
+> the int32 length are `0x00 0x00` and the low two bytes match the uint16 reading. The interpretations diverge only in
+> semantics and in the two cases the captures did not exercise: compressed parts (`isCompressed=0x01`) and bodies
+> larger than 65535 bytes (where the int32 length is required). The `format` / `isCompressed` / `length` reading
+> reflects the decompiled source and is adopted here.
 
-Followed by `length` bytes of UTF-8 JSON (or plain text for log messages).
+> **Large bodies.** The 4-byte `length` field carries the full part size with no chunking. The largest observed
+> `configure` body was ~260KB, well within the int32 range. The WebSocket frame's own payload length (which supports
+> 64-bit) carries the total message size.
 
-> **Large bodies**: When the body exceeds 65,535 bytes (uint16 max), the `length` field contains the size of the first
-> chunk, and the remaining data continues as raw bytes to the end of the WebSocket frame. The WebSocket frame's own
-> payload length (which supports 64-bit) carries the total size. The largest observed `configure` body was ~260KB.
+### Compression
+
+When `isCompressed=0x01`, the `content` bytes are zlib-compressed and must be inflated with `java.util.zip.Inflater`
+before parsing. Compression was not used in any observed capture but is supported by the framing.
 
 ### Example: `enableUpdatesChannel` (raw hex)
 
 ```
-01 01 00 00 00 00 00 78   ← header part: type=0x01, sub=0x01, len=120
+01 01 00 00 00 00 00 78   ← header part: type=0x01 (HEADER), format=0x01 (JSON), isCompressed=0, reserved=0, length=120
 {"timestamp":1782149129925,"type":"request","action":"enableUpdatesChannel",
  "id":"71ce354b-1970-439c-8e13-9230fd0eb3d2"}
 
-02 01 00 00 00 00 00 56   ← body part: type=0x02, sub=0x01, len=86
+02 01 00 00 00 00 00 56   ← body part: type=0x02 (BODY), format=0x01 (JSON), isCompressed=0, reserved=0, length=86
 {"uri":"wss://192.168.0.4:7442",
  "lastUpdateId":"53704449-963a-4ab6-afc8-a7a88b3946db"}
 ```
@@ -179,6 +188,76 @@ The header JSON contains message metadata. Three types were observed:
   "level": "info"
 }
 ```
+
+The body of a log message uses `format=0x02` (STRING) and contains plain text, e.g.
+`I/LiveViewFragment( 2307): onConfigure: count=16`.
+
+**Event (controller -> device, main channel):**
+
+```json
+{
+  "type": "event",
+  "name": "updateTriggeredAt",
+  "id": "<uuid>",
+  "timestamp": 1782149129925
+}
+```
+
+**Updates channel header (no `type` field):**
+
+The updates channel does not use the standard request/response header. The header JSON is parsed directly and carries
+the update payload's metadata:
+
+```json
+{
+  "action": "update",
+  "newUpdateId": "4889e570-77ca-4d71-8d0c-0667ab8102b",
+  "modelKey": "camera",
+  "id": "688e2bfe0165bd03e47c7518",
+  "mac": "8478482A633E",
+  "nvrMac": "602232609D4F",
+  "token": null,
+  "state": "CONNECTED",
+  "modifiedKeys": [
+    "videoReconfigurationInProgress",
+    "nvrMac"
+  ]
+}
+```
+
+### Message Types
+
+The protocol defines the following `type` values. Only the first five have handlers in the captured firmware; the rest
+are defined in the enum but no handler was found in source.
+
+| Enum          | JSON `type`      | Used                                            |
+|---------------|------------------|-------------------------------------------------|
+| REQUEST       | `"request"`      | Yes — both directions                           |
+| RESPONSE      | `"response"`     | Yes — both directions                           |
+| LOG           | `"log"`          | Yes — device → controller                       |
+| EVENT         | `"event"`        | Yes — controller → device (main channel)        |
+| UNKNOWN       | `""`             | Yes — updates channel (fallback when no `type`) |
+| HTTP_REQUEST  | `"httpRequest"`  | Defined, no handler found                       |
+| HTTP_RESPONSE | `"httpResponse"` | Defined, no handler found                       |
+| ERROR         | `"error"`        | Defined, no handler found                       |
+| CMD           | `"cmd"`          | Defined, no handler found                       |
+| CMD_RESPONSE  | `"cmdResponse"`  | Defined, no handler found                       |
+
+### Response Format
+
+All responses share these fields:
+
+| Field       | Type   | Description                     |
+|-------------|--------|---------------------------------|
+| `id`        | UUID   | Correlates request and response |
+| `timestamp` | Long   | Unix epoch milliseconds         |
+| `error`     | String | Empty string for success        |
+| `errorCode` | Int    | `0` for success                 |
+
+### Request ID Correlation
+
+The device uses a `ConcurrentHashMap` to map request IDs to callbacks. When a response arrives, its `id` is looked up
+and the corresponding callback is resumed.
 
 The `id` field is a UUID used for correlation between request and response. The `timestamp` is in milliseconds; values
 are consistent with Unix epoch.
@@ -370,14 +449,121 @@ Two `configure` payloads were captured - one for a 16-camera grid layout and one
 
 | Field       | Value       | Notes                                                  |
 |-------------|-------------|--------------------------------------------------------|
-| `name`      | `View Port` |                                                        |
-| `isDefault` | `false`     |                                                        |
-| `isGlobal`  | `false`     |                                                        |
+| `name`      | `View Port` | Ignored by device                                      |
+| `isDefault` | `false`     | Ignored by device                                      |
+| `isGlobal`  | `false`     | Ignored by device                                      |
 | `layout`    | `7`         | Layout type code - see [layout reference](./layout.md) |
-| `slots`     | [...]       | See below.                                             |
-| `owner`     | (present)   |                                                        |
-| `id`        | (present)   |                                                        |
-| `modelKey`  | (present)   |                                                        |
+| `slots`     | [...]       | See below. Required.                                   |
+| `owner`     | (present)   | Ignored by device                                      |
+| `id`        | (present)   | Ignored by device                                      |
+| `modelKey`  | (present)   | Ignored by device                                      |
+
+##### Slot Object
+
+```json
+{
+  "cameras": [
+    "63406125012bbf03e70003f0"
+  ],
+  "cycleMode": "time",
+  "cycleInterval": 10,
+  "dewarpState": {
+    "pan": 0.0,
+    "tilt": 0.0,
+    "zoom": 1.0
+  }
+}
+```
+
+| Field           | Type             | Required | Default  | Notes                                                                                                            |
+|-----------------|------------------|----------|----------|------------------------------------------------------------------------------------------------------------------|
+| `cameras`       | array of strings | No       | `[]`     | Camera IDs assigned to this slot                                                                                 |
+| `cycleMode`     | string           | No       | `"time"` | `"time"` or `"motion"`                                                                                           |
+| `cycleInterval` | int              | No       | `10`     | Seconds between camera rotations                                                                                 |
+| `dewarpState`   | object           | No       | `null`   | Fisheye dewarp parameters. Conversions: `pan` → `pan * 57` degrees, `tilt` → `tilt * 60` degrees, `zoom` → as-is |
+
+##### Slot Cycling
+
+Each slot can hold multiple cameras. The display mode is determined by camera count and `cycleMode`:
+
+| Mode            | Condition                                   | Behavior                                                        |
+|-----------------|---------------------------------------------|-----------------------------------------------------------------|
+| EMPTY           | No cameras                                  | Show empty slot                                                 |
+| SINGLE          | Exactly 1 camera                            | Show that camera                                                |
+| CYCLE_BY_TIME   | Multiple cameras + `cycleMode == "time"`    | Rotate every `cycleInterval` seconds (default 10s)              |
+| CYCLE_BY_MOTION | Multiple cameras + `cycleMode == "motion"`  | Stay on camera until motion detected (3s timeout), then advance |
+| UNKNOWN         | Multiple cameras + unrecognized `cycleMode` | Fallback                                                        |
+
+##### Camera Object (Fields the Device Reads)
+
+The device only reads the following fields from the full camera JSON (see the complete example below for the raw
+payload). All other camera JSON fields (hundreds) are ignored.
+
+| Field                        | Type   | Required | Default          | Notes                                 |
+|------------------------------|--------|----------|------------------|---------------------------------------|
+| `id`                         | string | **Yes**  | —                | Camera UUID; throws if null           |
+| `type`                       | string | No       | `""`             | Camera model (e.g. `"UVC G5 Bullet"`) |
+| `name`                       | string | No       | `""`             | Display name                          |
+| `state`                      | string | No       | `"DISCONNECTED"` | Connection state                      |
+| `isMicEnabled`               | bool   | No       | `false`          | Microphone enabled                    |
+| `lastMotion`                 | long   | No       | `0`              | Last motion timestamp                 |
+| `channels`                   | array  | No       | `[]`             | Video channel configs (see below)     |
+| `featureFlags.hasMic`        | bool   | No       | `false`          | Has microphone                        |
+| `featureFlags.hotplug.video` | bool   | No       | `true`           | Hotplug video available               |
+| `stopStreamLevel`            | int    | No       | `-1`             | Stream stop level                     |
+| `ispSettings.mountPosition`  | string | No       | `""`             | Mount position                        |
+| `isThirdPartyCamera`         | bool   | No       | `false`          | Third-party camera                    |
+| `videoCodec`                 | string | No       | `""`             | Codec (e.g. `"h265"`)                 |
+
+##### Channel Object
+
+```json
+{
+  "id": 0,
+  "name": "High",
+  "enabled": true,
+  "width": 2688,
+  "height": 1512,
+  "fps": 30.0
+}
+```
+
+| Field     | Type   | Default | Notes                                   |
+|-----------|--------|---------|-----------------------------------------|
+| `id`      | int    | `-1`    | Channel index (0=High, 1=Medium, 2=Low) |
+| `name`    | string | `""`    | Channel name                            |
+| `enabled` | bool   | `false` | Whether enabled                         |
+| `width`   | int    | `1280`  | Video width                             |
+| `height`  | int    | `720`   | Video height                            |
+| `fps`     | double | `-1.0`  | Frames per second                       |
+
+##### HQ Stream Quality
+
+"HQ" is controlled by the `channel` index in `getStreamAlias` requests:
+
+- Channel 0 = highest quality
+- Channel 1 = medium
+- Channel 2 = low
+
+The `preferHq` layout attribute (set on layout 1 slot 0 and layout 6 slot 0) forces channel to 0, overriding
+bandwidth-aware selection. The `DecoderLoadingManager` tries channels 0 → 1 → 2 based on bandwidth; when
+`preferHq=true`, channel is always forced to 0.
+
+The stream URL itself contains no quality parameter — quality is determined server-side from the `channel` field in
+the `getStreamAlias` request.
+
+##### Post-Configure Flow
+
+After processing `configure`, the device:
+
+1. Stores top-level config in persistent state.
+2. Stores slot entities in database.
+3. Stores slot-camera cross-references.
+4. Stores camera entities and channel entities.
+5. Iterates the camera list and sends `getStreamAlias` for each camera.
+6. Logs `onConfigure: count=N`.
+
+#### Slot example
 
 Each slot:
 
@@ -393,7 +579,7 @@ Each slot:
 
 - `cameras`: array of camera IDs (one camera per slot in both captures)
 - `cycleMode`: `"time"` or `"motion"` - observed values
-- `cycleInterval`: cycling interval (observed: `10`; unit not confirmed)
+- `cycleInterval`: cycling interval in seconds (observed: `10`; default `10`)
 
 #### `cameras`
 
@@ -1496,6 +1682,58 @@ state changes, firmware updates).
 }
 ```
 
+### Additional Messages (from decompiled source, not in captures)
+
+The following message handlers were identified in the decompiled firmware but were not exercised in the captured
+adoption flow. Direction and body shape are from source; the exact JSON bodies sent by a real controller may differ
+in field ordering or optional fields.
+
+| Action               | Direction | Body                                 | Response Body          |
+|----------------------|-----------|--------------------------------------|------------------------|
+| `reboot`             | C → D     | `{}`                                 | `{}`                   |
+| `factoryReset`       | C → D     | `{}`                                 | `{}`                   |
+| `setVolume`          | C → D     | `{volume: int}`                      | `{}`                   |
+| `updateFirmware`     | C → D     | `{uri: string}`                      | `{}`                   |
+| `updateSoftware`     | C → D     | `{uri: string}`                      | `{}`                   |
+| `supportInfo`        | C → D     | `{uri, timeoutMs?, useCompression?}` | `{}`                   |
+| `getAllCameraStatus` | D → C     | `{}`                                 | JSON (camera statuses) |
+
+### Events (Controller -> Device, Main Channel)
+
+| Event Name          | Direction | Body                                        |
+|---------------------|-----------|---------------------------------------------|
+| `updateTriggeredAt` | C → D     | `{type: "uos"\|"protect", timestamp: long}` |
+
+## Updates Channel
+
+### Connection
+
+- URL: `wss://{controller}:7442/?lastUpdateId={uuid}`
+- Protocol: `Sec-WebSocket-Protocol: updates`
+- Headers: same as the main channel except **no `x-guid`**
+- TLS: same client cert + TOFU trust manager as the main channel
+- Ping interval: 15 seconds
+- Connect timeout: 5 seconds
+- No retry on failure (`retryOnConnectionFailure(false)`)
+
+### Message Handling
+
+Only `action == "update"` with `modelKey == "camera"` is processed. Other modelKeys (`liveview`, `viewer`, `nvr`,
+`user`) are silently ignored.
+
+When `modelKey == "camera"`:
+
+1. Extract `id` (camera ID) from the header JSON.
+2. Parse body as delta JSON (only changed fields, matching `modifiedKeys`).
+3. Update camera state in the camera repository.
+
+The `newUpdateId` field is stored and used as the `lastUpdateId` query parameter on reconnection.
+
+### What Requires Full Re-Configure
+
+Liveview layout changes, slot assignment changes, and camera additions/removals require a new `configure` message on
+the main channel. The updates channel only handles per-camera incremental updates.
+
 ## Stream Delivery
 
 The viewer **pulls** streams from the controller. Observed flow:
@@ -1517,15 +1755,39 @@ The viewer **pulls** streams from the controller. Observed flow:
 | 7446 | WSS      | Livestream WebSocket (stream delivery)                                     |
 | 7447 | RTSP     | RTSP livestream                                                            |
 
-## TLS Client Certificate
+## TLS
 
-The `ds` proxy requires a TLS client certificate. It extracts the fingerprint (colon-separated hex, consistent with SHA1
-format) and forwards it as the `x-fingerprint` header.
+### Device-Side TLS (port 8080 server)
 
-The fingerprints changed between factory resets. The actual certificate subject, key type, and validity period were not
-captured - TLS 1.3 encrypts the client certificate in the handshake.
+- Self-signed certificate, RSA 2048-bit, SHA256withRSA.
+- Subject / Issuer: `CN=UI RSA, O=UI`.
+- Validity: `now - 5 years` to `now + 20 years` (25-year window).
+- No client certificate required (`setWantClientAuth(false)`, `setNeedClientAuth(false)`).
+- Enabled protocols: TLS 1.2 and TLS 1.3.
+- 13 weak cipher suites disabled.
+- Controller does not verify the server certificate (accepts self-signed).
 
-So the protocol appears to use no certificate-pinning and uses self-signed client certificates after adoption.
+### Client-Side TLS (port 7442 WSS)
+
+- Same self-signed certificate used as client cert (dual-use: 8080 server + 7442 client).
+- Hostname verification disabled (always returns true).
+- **TOFU (Trust On First Use)** for the NVR server cert: stores the SHA-256 fingerprint on first connection in
+  Android `SharedPreferences` key `nvr_fingerprint_2`, and compares on subsequent connections. A mismatch is rejected
+  with `CertificateException`.
+- The `ds` proxy extracts the client cert fingerprint (colon-separated hex, consistent with SHA1 format) and forwards
+  it as the `x-fingerprint` header.
+
+> The TLS 1.3 capture could not see the client certificate (encrypted in the handshake), so the subject / key type /
+> validity of the *controller's* server cert is unknown from capture alone. The decompiled source describes the TOFU
+> behavior and the `nvr_fingerprint_2` storage key. The device's own dual-use cert is RSA 2048 / `CN=UI RSA, O=UI`.
+
+### Disconnect / Retry
+
+- Connect timeout: 5 seconds.
+- On `SocketTimeoutException`: calls `onDisconnect`, clears slot/camera repositories, retries.
+- Retry delay: 5 seconds.
+- No automatic retry on the updates channel (`retryOnConnectionFailure(false)`).
+- Main channel disconnect triggers a full reconnect cycle (re-establishes both the main and updates channels).
 
 ## Device Type Identification
 
